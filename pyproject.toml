@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seam-factor-mining"
+version = "0.1.0"
+description = "A platform-neutral factor mining engine with pluggable research strategies and evaluation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "numpy", "scipy"]
+
+[tool.setuptools.packages.find]
+include = ["factor_mining*", "seam*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
