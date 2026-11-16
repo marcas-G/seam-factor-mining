@@ -4,8 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import uuid4
 
+from .validation import FactorValidator
+
 from .contracts import (
-    EvaluationResult, FactorEvaluator, FactorObjective, MiningResult,
+    EvaluationResult, FactorCandidate, FactorEvaluator, FactorObjective, MiningResult,
     MiningTask, ProposalStrategy, ScoreDecision, Trial, TrialRecorder,
 )
 
@@ -34,11 +36,13 @@ class MiningEngine:
         objective: FactorObjective,
         config: RunConfig | None = None,
         recorder: TrialRecorder | None = None,
+        validator: FactorValidator | None = None,
     ) -> None:
         self.evaluator = evaluator
         self.objective = objective
         self.config = config or RunConfig()
         self.recorder = recorder
+        self.validator = validator
 
     def run(self, task: MiningTask, strategy: ProposalStrategy) -> MiningResult:
         run_id = uuid4().hex
@@ -58,7 +62,7 @@ class MiningEngine:
             if candidate is None:
                 stop_reason = "strategy_exhausted"
                 break
-            if not isinstance(candidate, type_seen_candidate()):
+            if not isinstance(candidate, FactorCandidate):
                 raise TypeError("strategy must return FactorCandidate or None")
 
             prior = seen.get(candidate.fingerprint)
@@ -69,6 +73,16 @@ class MiningEngine:
                     duplicate=True,
                 )
             else:
+                validation = self.validator.validate(candidate, task) if self.validator else None
+                if validation is not None and not validation.valid:
+                    evaluation = EvaluationResult(status="error", error="; ".join(validation.issues) or "validation rejected")
+                    decision = ScoreDecision(False, None, evaluation.error or "validation rejected")
+                    trial = Trial(index, candidate, evaluation, decision)
+                    seen[candidate.fingerprint] = trial
+                    trials.append(trial)
+                    if self.recorder is not None:
+                        self.recorder.write_trial(run_id, task, trial)
+                    continue
                 try:
                     evaluation = self.evaluator.evaluate(candidate, task)
                     if not isinstance(evaluation, EvaluationResult):
@@ -91,13 +105,6 @@ class MiningEngine:
                 self.recorder.write_trial(run_id, task, trial)
 
         return MiningResult(run_id, task, tuple(trials), best, evaluations, stop_reason)
-
-
-def type_seen_candidate():
-    # Local import keeps the runtime type check readable without tying the engine
-    # to a particular strategy implementation.
-    from .contracts import FactorCandidate
-    return FactorCandidate
 
 
 def evaluate_holdout(

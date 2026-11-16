@@ -16,3 +16,6 @@ __all__ = [
     "MetricConstraint", "MetricObjective", "ListStrategy", "CallbackStrategy",
     "CallableEvaluator", "PipelineEvaluator", "JsonlRecorder",
 ]
+
+from .validation import CompositeValidator, ExpressionPolicy, LanguageAllowlist, ValidationResult
+from .experiment import ExperimentCase, ExperimentOutcome, ExperimentReport, ExperimentRunner
